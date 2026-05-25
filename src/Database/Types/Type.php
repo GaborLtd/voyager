@@ -75,6 +75,17 @@ abstract class Type extends DoctrineType
         return static::$platformTypeMapping;
     }
 
+    /**
+     * Reset cached platform-specific state so a fresh DB connection (e.g. a new
+     * SQLite :memory: instance in a test) gets its own type registration pass.
+     */
+    public static function resetPlatformTypes(): void
+    {
+        static::$customTypesRegistered = false;
+        static::$platformTypeMapping   = [];
+        static::$platformTypes         = [];
+    }
+
     public static function registerCustomPlatformTypes($force = false)
     {
         if (static::$customTypesRegistered && !$force) {
