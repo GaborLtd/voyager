@@ -4,8 +4,7 @@ namespace TCG\Voyager\Http\Controllers\ContentTypes;
 
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Intervention\Image\Constraint;
-use Intervention\Image\Facades\Image as InterventionImage;
+use Intervention\Image\Laravel\Facades\Image as InterventionImage;
 
 class Image extends BaseType
 {
@@ -18,7 +17,7 @@ class Image extends BaseType
 
             $filename = $this->generateFileName($file, $path);
 
-            $image = InterventionImage::make($file)->orientate();
+            $image = InterventionImage::read($file)->orient();
 
             $fullPath = $path.$filename.'.'.$file->getClientOriginalExtension();
 
@@ -39,28 +38,29 @@ class Image extends BaseType
             }
 
             $resize_quality = isset($this->options->quality) ? intval($this->options->quality) : 75;
+            $noUpsize = isset($this->options->upsize) && !$this->options->upsize;
 
-            $image = $image->resize(
-                $resize_width,
-                $resize_height,
-                function (Constraint $constraint) {
-                    $constraint->aspectRatio();
-                    if (isset($this->options->upsize) && !$this->options->upsize) {
-                        $constraint->upsize();
-                    }
-                }
-            )->encode($file->getClientOriginalExtension(), $resize_quality);
+            if ($noUpsize) {
+                $image->scaleDown($resize_width, $resize_height);
+            } else {
+                $image->scale($resize_width, $resize_height);
+            }
+
+            $ext = $file->getClientOriginalExtension();
+            $encoded = $image->encodeByExtension($ext, quality: $resize_quality);
 
             if ($this->is_animated_gif($file)) {
-                Storage::disk(config('voyager.storage.disk'))->put($fullPath, file_get_contents($file), 'public');
-                $fullPathStatic = $path.$filename.'-static.'.$file->getClientOriginalExtension();
-                Storage::disk(config('voyager.storage.disk'))->put($fullPathStatic, (string) $image, 'public');
+                Storage::disk(config('voyager.storage.disk'))->put($fullPath, file_get_contents($file->getRealPath()), 'public');
+                $fullPathStatic = $path.$filename.'-static.'.$ext;
+                Storage::disk(config('voyager.storage.disk'))->put($fullPathStatic, $encoded->toString(), 'public');
             } else {
-                Storage::disk(config('voyager.storage.disk'))->put($fullPath, (string) $image, 'public');
+                Storage::disk(config('voyager.storage.disk'))->put($fullPath, $encoded->toString(), 'public');
             }
 
             if (isset($this->options->thumbnails)) {
                 foreach ($this->options->thumbnails as $thumbnails) {
+                    $thumbEncoded = null;
+
                     if (isset($thumbnails->name) && isset($thumbnails->scale)) {
                         $scale = intval($thumbnails->scale) / 100;
                         $thumb_resize_width = $resize_width;
@@ -74,32 +74,29 @@ class Image extends BaseType
                             $thumb_resize_height = intval($thumb_resize_height * $scale);
                         }
 
-                        $image = InterventionImage::make($file)
-                            ->orientate()
-                            ->resize(
-                                $thumb_resize_width,
-                                $thumb_resize_height,
-                                function (Constraint $constraint) {
-                                    $constraint->aspectRatio();
-                                    if (isset($this->options->upsize) && !$this->options->upsize) {
-                                        $constraint->upsize();
-                                    }
-                                }
-                            )->encode($file->getClientOriginalExtension(), $resize_quality);
+                        $thumbImage = InterventionImage::read($file)->orient();
+                        if ($noUpsize) {
+                            $thumbImage->scaleDown($thumb_resize_width, $thumb_resize_height);
+                        } else {
+                            $thumbImage->scale($thumb_resize_width, $thumb_resize_height);
+                        }
+                        $thumbEncoded = $thumbImage->encodeByExtension($ext, quality: $resize_quality);
                     } elseif (isset($thumbnails->crop->width) && isset($thumbnails->crop->height)) {
                         $crop_width = $thumbnails->crop->width;
                         $crop_height = $thumbnails->crop->height;
-                        $image = InterventionImage::make($file)
-                            ->orientate()
-                            ->fit($crop_width, $crop_height)
-                            ->encode($file->getClientOriginalExtension(), $resize_quality);
+                        $thumbEncoded = InterventionImage::read($file)
+                            ->orient()
+                            ->cover($crop_width, $crop_height)
+                            ->encodeByExtension($ext, quality: $resize_quality);
                     }
 
-                    Storage::disk(config('voyager.storage.disk'))->put(
-                        $path.$filename.'-'.$thumbnails->name.'.'.$file->getClientOriginalExtension(),
-                        (string) $image,
-                        'public'
-                    );
+                    if ($thumbEncoded !== null) {
+                        Storage::disk(config('voyager.storage.disk'))->put(
+                            $path.$filename.'-'.$thumbnails->name.'.'.$ext,
+                            $thumbEncoded->toString(),
+                            'public'
+                        );
+                    }
                 }
             }
 
@@ -135,9 +132,9 @@ class Image extends BaseType
         return $filename;
     }
 
-    private function is_animated_gif($filename)
+    private function is_animated_gif($file)
     {
-        $raw = file_get_contents($filename);
+        $raw = file_get_contents($file->getRealPath());
 
         $offset = 0;
         $frames = 0;

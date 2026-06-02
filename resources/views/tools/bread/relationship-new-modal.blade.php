@@ -40,7 +40,7 @@
 				               	</div>
 				               	<div class="hasOneMany flexed">
 				            		<label>{{ __('voyager::database.relationship.which_column_from') }} <span class="label_table_name"></span> {{ __('voyager::database.relationship.is_used_to_reference') }} <span>{{ \Illuminate\Support\Str::singular(ucfirst($table)) }}</span>?</label>
-					                <select name="relationship_column" class="new_relationship_field select2 rowDrop" data-table="{{ $tables[0] }}" data-selected="">
+					                <select name="relationship_column" class="new_relationship_field select2 rowDrop" data-table="{{ $tables[0] ?? '' }}" data-selected="">
 					                </select>
 					            </div>
 				            </div>
@@ -56,12 +56,12 @@
 				                <div class="well">
 				                    <label>{{ __('voyager::database.relationship.selection_details') }}</label>
 				                    <p><strong>{{ __('voyager::database.relationship.display_the') }} <span class="label_table_name"></span>: </strong>
-				                        <select name="relationship_label" class="rowDrop select2" data-table="{{ $tables[0] }}" data-selected="" style="width: 100%">
+				                        <select name="relationship_label" class="rowDrop select2" data-table="{{ $tables[0] ?? '' }}" data-selected="" style="width: 100%">
 				                        </select>
 				                    </p>
 									<p class="relationship_key belongsToShow belongsToManyShow"><strong>{{ __('voyager::database.relationship.store_the') }}
                                         <span class="label_table_name"></span>: </strong>
-				                        <select name="relationship_key" class="rowDrop select2" data-table="{{ $tables[0] }}" data-selected="" style="width: 100%">
+				                        <select name="relationship_key" class="rowDrop select2" data-table="{{ $tables[0] ?? '' }}" data-selected="" style="width: 100%">
 				                        </select>
 									</p>
                                     <p class="relationship_key hasOneShow hasManyShow"><strong>{{ __('voyager::database.relationship.store_the') }}

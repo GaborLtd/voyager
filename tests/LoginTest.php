@@ -51,8 +51,10 @@ class LoginTest extends TestCase
              ->seePageIs(route('voyager.login'));
     }
 
-    public function testGetsLockedOutAfterFiveAttempts()
+public function testGetsLockedOutAfterFiveAttempts()
     {
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::now());
+
         session()->setPreviousUrl(route('voyager.login'));
 
         for ($i = 0; $i <= 5; $i++) {
@@ -63,5 +65,7 @@ class LoginTest extends TestCase
         }
 
         $t->see(__('auth.throttle', ['seconds' => 60]));
+
+        \Illuminate\Support\Carbon::setTestNow();
     }
 }

@@ -4,6 +4,8 @@ namespace TCG\Voyager\Tests;
 
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Orchestra\Testbench\BrowserKit\TestCase as OrchestraTestCase;
+use TCG\Voyager\Database\Schema\SchemaManager;
+use TCG\Voyager\Database\Types\Type;
 use TCG\Voyager\Models\User;
 use TCG\Voyager\VoyagerServiceProvider;
 
@@ -14,6 +16,11 @@ class TestCase extends OrchestraTestCase
     public function setUp(): void
     {
         parent::setUp();
+
+        // Reset cached static state that depends on the DB connection so that each
+        // test starts with a fresh connection to its own SQLite :memory: instance.
+        SchemaManager::resetConnection();
+        Type::resetPlatformTypes();
 
         $this->loadLaravelMigrations();
 
@@ -51,12 +58,28 @@ class TestCase extends OrchestraTestCase
         ];
     }
 
-    public function tearDown(): void
-    {
-        //parent::tearDown();
+protected function tearDown(): void
+{
+    $errorHandler = set_error_handler(static function () {});
+    restore_error_handler();
 
-        //$this->artisan('migrate:reset');
+    if ($errorHandler !== null) {
+        if (!is_object($errorHandler) || !str_contains(get_class($errorHandler), 'PHPUnit')) {
+            @restore_error_handler();
+        }
     }
+
+    $exceptionHandler = set_exception_handler(static function () {});
+    restore_exception_handler();
+
+    if ($exceptionHandler !== null) {
+        if (!is_object($exceptionHandler) || !str_contains(get_class($exceptionHandler), 'PHPUnit')) {
+            @restore_exception_handler();
+        }
+    }
+
+    parent::tearDown();
+}
 
     /**
      * Define environment setup.
